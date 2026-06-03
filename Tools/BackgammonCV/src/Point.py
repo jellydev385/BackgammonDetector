@@ -35,3 +35,9 @@ class Point:
         point.color = self.color
 
         return point
+    
+    def __eq__(self, other):
+        return (isinstance(other, Point)
+                and self.id == other.id 
+                and self.disks == other.disks 
+                and self.color == other.color)

@@ -62,6 +62,7 @@ class BackgammonCV:
         self.point_bboxs = POINT_BBOXS
 
         self.board = Board()
+        self.prev_board = Board()
         self.board_scene = 0
 
         self.p_min = 0.2
@@ -324,10 +325,10 @@ class BackgammonCV:
             else:
                 self.board_scene.detecting()
 
-            if isinstance(image, str):
-                self.frame = cv2.imread(image)
-            else:
-                self.frame = image
+            # if isinstance(image, str):
+            #     self.frame = cv2.imread(image)
+            # else:
+            #     self.frame = image
 
             # cv2.imshow("Source", self.frame)
 
@@ -370,6 +371,14 @@ class BackgammonCV:
             # print("Dices: " + str(self.board.dices))
 
             self.board_scene.updateBoard(self.board)
+            # save board state in snapshots
+            if( self.prev_board != self.board ):
+                print(f"Current: {str(self.board)}")
+                text_file = open(f"frame_{self.frame_index}.txt", "w")
+                s = str(self.board) + "\n"
+                text_file.write(s)
+                text_file.close()
+                self.prev_board = self.board.copy()
 
             # Add snapshot
             snapshot = Snapshot(self.frame_index, self.board.copy(), self.frame.copy(), self.transparent_overlay.copy())
@@ -382,7 +391,7 @@ class BackgammonCV:
                 break
             # time.sleep(0.1)
             self.nextFrame()
-            self.detect(self.frame)
+            # self.detect(self.frame)
 
     # def warp_point(self, center, M):
     #     x, y = center

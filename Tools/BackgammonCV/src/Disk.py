@@ -20,3 +20,7 @@ class Disk:
     def copy(self):
         disk = Disk(self.center, self.confidence, self.color)
         return disk
+
+    def __eq__(self, other):
+        return (isinstance(other, Disk)
+                and self.color == other.color)

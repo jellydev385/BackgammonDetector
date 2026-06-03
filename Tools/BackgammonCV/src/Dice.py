@@ -25,3 +25,9 @@ class Dice:
 
     def __repr__(self):
         return str(self.value)
+
+    def __eq__(self, other):
+        return (isinstance(other, Dice)
+                and self.id == other.id 
+                and self.board_position == other.board_position 
+                and self.color == other.color)

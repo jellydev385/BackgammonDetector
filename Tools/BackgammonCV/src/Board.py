@@ -70,3 +70,8 @@ class Board:
         board.dices = self.dices.copy()
         return board
         # return copy.deepcopy(self)
+
+    def __eq__(self, other):
+        return (isinstance(other, Board)
+                and self.points == other.points 
+                and self.dices == other.dices)
