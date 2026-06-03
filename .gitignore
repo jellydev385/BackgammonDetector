@@ -1,0 +1,6 @@
+/Project/backgammon-app/backend/.venv
+/Project/backgammon-app/backend/.env
+/Project/backgammon-app/frontend/node_modules
+/Tools/BackgammonCV/data/cfg/yolov4.weights
+/Tools/BackgammonCV/data/videos/result/*.mp4
+/Tools/BackgammonCV/data/videos/*.mp4
