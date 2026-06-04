@@ -10,6 +10,6 @@ class Class:
     DICE_6 = 5
     DICES = DICE_6
 
-    DISK_WHITE = 6
-    DISK_BLACK = 7
+    DISK_BLACK = 6
+    DISK_WHITE = 7
     DISKS = DISK_WHITE

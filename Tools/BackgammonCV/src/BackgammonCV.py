@@ -24,6 +24,8 @@ from Snapshot import Snapshot
 from Snapshots import Snapshots
 from ultralytics import YOLO
 
+from checker_color_classifier import classify_checkers_by_brightness
+
 class BackgammonCV:
     def __init__(self):
 
@@ -108,7 +110,7 @@ class BackgammonCV:
 
         # displaying the image
         cv2.imshow("Source", self.frame)
-        # cv2.setMouseCallback("Source", self.mouseEvent)
+        cv2.setMouseCallback("Source", self.mouseEvent)
         # detecting bounding box of frame
         model = YOLO("border_model.pt")
 
@@ -123,93 +125,119 @@ class BackgammonCV:
         # Run inference on GPU
         results = model.predict(
             source=enhanced,
-            device=0,      # Use RTX 3060
             conf=0.25
         )
         
         # Get bounding boxes in xyxy format
-        if hasattr(results[0], 'boxes') and results[0].boxes is not None:
-            xyxy = results[0].boxes.xyxy
-            print("\nBounding boxes (xyxy):")
-            print(xyxy)
-            print(f"Number of detections: {len(xyxy)}")
-            for i, box in enumerate(xyxy):
-                x1, y1, x2, y2 = box[0], box[1], box[2], box[3]
-                print(f"Box {i}: x1={x1:.2f}, y1={y1:.2f}, x2={x2:.2f}, y2={y2:.2f}")
-                
-                # Extract 4 corner points
-                # self.points_homography = [
-                #     (x1, y1),      # top-left
-                #     (x2, y1),      # top-right
-                #     (x2, y2),      # bottom-right
-                #     (x1, y2),      # bottom-left
-                # ]
-                self.points_homography.append((int(x1.item()), int(y1.item())))
-                self.points_homography.append((int(x2.item()), int(y1.item())))
-                self.points_homography.append((int(x2.item()), int(y2.item())))
-                self.points_homography.append((int(x1.item()), int(y2.item())))
+        result = results[0]
+        class_names = model.names
+        detections  = []
+        if result.keypoints is None or len(result.boxes) == 0:
+            print("No detections found.")
+            return
+        
+        boxes  = result.boxes.xywh.cpu().numpy()   # (N, 4) cx cy w h  – pixel coords
+        kps    = result.keypoints.xy.cpu().numpy() # (N, K, 2)
+        confs  = result.boxes.conf.cpu().numpy()
+        cls_ids = result.boxes.cls.cpu().numpy().astype(int)
 
-                print(f"  Corner points: {self.points_homography}")
-                break
+        num_kps = kps.shape[1]
+        if num_kps < 4:
+            print(f"[WARN] Model has only {num_kps} keypoint(s); expected 4.")
+
+        for i in range(len(boxes)):
+            cx, cy, w, h = boxes[i]
+            det = {
+                "class_id":   cls_ids[i],
+                "class_name": class_names[cls_ids[i]],
+                "confidence": float(confs[i]),
+                "cx": float(cx), "cy": float(cy),
+                "w":  float(w),  "h":  float(h),
+            }
+            for k in range(min(4, num_kps)):
+                det[f"x{k+1}"] = float(kps[i, k, 0])
+                det[f"y{k+1}"] = float(kps[i, k, 1])
+            detections.append(det)
+        
+        for idx, d in enumerate(detections):
+            print(
+                f"{idx:<4} {d['class_name']:<15} {d['confidence']:>6.3f}  "
+                f"{d['cx']:>8.2f} {d['cy']:>8.2f} {d['w']:>8.2f} {d['h']:>8.2f}  "
+                f"{d['x1']:>8.2f} {d['y1']:>8.2f}  "
+                f"{d['x2']:>8.2f} {d['y2']:>8.2f}  "
+                f"{d['x3']:>8.2f} {d['y3']:>8.2f}  "
+                f"{d['x4']:>8.2f} {d['y4']:>8.2f}"
+            )
+            self.points_homography.append((int(d['x1']), int(d['y1'])))
+            self.points_homography.append((int(d['x2']), int(d['y2'])))
+            self.points_homography.append((int(d['x3']), int(d['y3'])))
+            self.points_homography.append((int(d['x4']), int(d['y4'])))
+
+            print(f"  Corner points: {self.points_homography}")
+            break
             
+        for cords in self.points_homography:
+            x, y = cords
+            cv2.putText(self.overlay_text, str(cords[0]) + ", " + str(y), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.circle(self.overlay_text, (x, y), 2, (0, 0, 255), 2)
+        cv2.imshow("Source", self.overlay_text)
+
+        # print(points_img)
+        self.overlay_text = self.frame.copy()
+
+        self.board.bbox = self.points_homography.copy()
+        print(f"board.bbox: {self.board.bbox}")
+
+        # Draw
+        if( len(self.points_homography) == NUM_POINT_HOMOGRAPHY ):
             for cords in self.points_homography:
                 x, y = cords
-                cv2.putText(self.overlay_text, str(cords[0]) + ", " + str(y), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 1, cv2.LINE_AA)
+                print(f"cords: {cords}")
                 cv2.circle(self.overlay_text, (x, y), 2, (0, 0, 255), 2)
+
+            # MATRIX TRANFORM --------------------------------------------------------------
+
+            # Find matrix
+            source = np.asarray(self.points_template, dtype=np.float32)
+            # print(f"   ##### source: {source}")
+            destination = np.asarray(self.points_homography, dtype=np.float32)
+            # print(f"   ##### destination: {destination}")
+            self.transformation_matrix = cv2.getPerspectiveTransform(source, destination)
+            # print(f"self.transformation_matrix: {self.transformation_matrix}")
+
+            image_out = cv2.warpPerspective(self.template, self.transformation_matrix, (self.image_width, self.image_height))
+            # print(f"image_out: {image_out}")
+            
+            # Apply transofmration to all point's bbox
+            for point in self.board.points:
+                point.bbox_warped = np.asarray(point.bbox_warped, dtype=np.float32)
+                point.bbox_warped = point.bbox_warped.reshape((-1, 1, 2))
+
+                point.bbox_warped = cv2.perspectiveTransform(point.bbox_warped, self.transformation_matrix)
+
+                point.bbox_warped = np.array(point.bbox_warped, dtype=np.int32)
+
+                # point.center = self.warp_point(point.center, self.transformation_matrix)
+
+                # Draw
+                overlay_copy = self.overlay_text.copy()
+                cv2.fillConvexPoly(overlay_copy, point.bbox_warped, (255, 255, 255))
+
+                self.overlay_text = cv2.addWeighted(overlay_copy, self.alpha_overlay, self.overlay_text, 1 - self.alpha_overlay, 0)
+
+            self.overlay = cv2.add(self.overlay_text, image_out)
+
+            # print(self.board)
+            self.template_aligned = True
+            self.board_scene.update()
             cv2.imshow("Source", self.overlay_text)
-
-            # print(points_img)
-            self.overlay_text = self.frame.copy()
-
-            self.board.bbox = self.points_homography.copy()
-            print(f"board.bbox: {self.board.bbox}")
-
-            # Draw
-            if( len(self.points_homography) == NUM_POINT_HOMOGRAPHY ):
-                for cords in self.points_homography:
-                    x, y = cords
-                    print(f"cords: {cords}")
-                    cv2.circle(self.overlay_text, (x, y), 2, (0, 0, 255), 2)
-
-                # MATRIX TRANFORM --------------------------------------------------------------
-
-                # Find matrix
-                source = np.asarray(self.points_template, dtype=np.float32)
-                # print(f"   ##### source: {source}")
-                destination = np.asarray(self.points_homography, dtype=np.float32)
-                # print(f"   ##### destination: {destination}")
-                self.transformation_matrix = cv2.getPerspectiveTransform(source, destination)
-                # print(f"self.transformation_matrix: {self.transformation_matrix}")
-
-                image_out = cv2.warpPerspective(self.template, self.transformation_matrix, (self.image_width, self.image_height))
-                # print(f"image_out: {image_out}")
-                
-                # Apply transofmration to all point's bbox
-                for point in self.board.points:
-                    point.bbox_warped = np.asarray(point.bbox_warped, dtype=np.float32)
-                    point.bbox_warped = point.bbox_warped.reshape((-1, 1, 2))
-
-                    point.bbox_warped = cv2.perspectiveTransform(point.bbox_warped, self.transformation_matrix)
-
-                    point.bbox_warped = np.array(point.bbox_warped, dtype=np.int32)
-
-                    # point.center = self.warp_point(point.center, self.transformation_matrix)
-
-                    # Draw
-                    overlay_copy = self.overlay_text.copy()
-                    cv2.fillConvexPoly(overlay_copy, point.bbox_warped, (255, 255, 255))
-
-                    self.overlay_text = cv2.addWeighted(overlay_copy, self.alpha_overlay, self.overlay_text, 1 - self.alpha_overlay, 0)
-
-                self.overlay = cv2.add(self.overlay_text, image_out)
-
-                # print(self.board)
-                self.template_aligned = True
-                self.board_scene.update()
-                cv2.imshow("Source", self.overlay_text)
-                # self.detect(self.image)
+            # self.detect(self.image)
 
     def mouseEvent(self, event, x, y, flags, params):
+
+        print(f"Mouse x,y = ({x}, {y})\r", end="")
+        if ( self.isPlaying == True ):
+            return
 
         # Test pointInPoly
         if event == cv2.EVENT_MOUSEMOVE:
@@ -338,26 +366,32 @@ class BackgammonCV:
 
             self.detector.detect(self.frame)
 
-            self.overlay = self.detector.drawResult()
-            self.transparent_overlay = self.detector.drawBboxs()
-
             self.board.dices = []  # self.board.clear()
 
+            checker_results = classify_checkers_by_brightness(self.frame, self.detector.bounding_boxes)
             # Generate objects from YOLO detection ---------------------------------------------------------------
             for i in range(len(self.detector.centers)):
+                checker_result = checker_results[i]
+                if self.detector.class_numbers[i] >= 6:
+
+                    print(f"Checker at {self.detector.centers[i]} classified as {checker_result.label} with brightness {checker_result.brightness:.2f} and average BGR {checker_result.average_bgr}")
+                    if checker_result.label == "white":
+                        self.detector.class_numbers[i] = Class.DISK_WHITE
+                    else:
+                        self.detector.class_numbers[i] = Class.DISK_BLACK
 
                 # DISK WHITE
                 if self.detector.class_numbers[i] == Class.DISK_WHITE:
-                    newDisk = Disk(self.detector.centers[i], self.detector.confidences[i], Color.BLACK)
+                    newDisk = Disk(self.detector.centers[i], self.detector.confidences[i], Color.WHITE)
                     self.board.addDisk(newDisk)
 
                 # DISK BLACK
                 if self.detector.class_numbers[i] == Class.DISK_BLACK:
-                    newDisk = Disk(self.detector.centers[i], self.detector.confidences[i], Color.WHITE)
+                    newDisk = Disk(self.detector.centers[i], self.detector.confidences[i], Color.BLACK)
                     self.board.addDisk(newDisk)
 
                 # DICE
-                if self.detector.class_numbers[i] < Class.DISKS:
+                if self.detector.class_numbers[i] <= Class.DICE_6:
                     newDice = Dice(self.detector.class_numbers[i], self.detector.centers[i], self.detector.confidences[i])
 
                     # Dice position binarization
@@ -370,10 +404,13 @@ class BackgammonCV:
 
             # print("Dices: " + str(self.board.dices))
 
+            self.overlay = self.detector.drawResult()
+            self.transparent_overlay = self.detector.drawBboxs()
+
             self.board_scene.updateBoard(self.board)
             # save board state in snapshots
             if( self.prev_board != self.board ):
-                print(f"Current: {str(self.board)}")
+                # print(f"Current: {str(self.board)}")
                 text_file = open(f"frame_{self.frame_index}.txt", "w")
                 s = str(self.board) + "\n"
                 text_file.write(s)
