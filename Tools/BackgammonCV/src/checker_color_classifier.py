@@ -56,19 +56,35 @@ def extract_checker_roi(image: np.ndarray, bbox: BBox, bbox_format: BBoxFormat =
     return image[y1:y2, x1:x2]
 
 
-def compute_average_bgr_and_brightness(roi: np.ndarray) -> tuple[tuple[float, float, float], float]:
-    """Compute the average BGR color and a grayscale brightness value for the ROI."""
-    pixels = roi.reshape(-1, 3).astype(np.float32)
+def compute_checker_color(roi):
+    h, w = roi.shape[:2]
 
-    # Average BGR color inside the checker bounding box.
-    avg_bgr = pixels.mean(axis=0)
-    b, g, r = float(avg_bgr[0]), float(avg_bgr[1]), float(avg_bgr[2])
+    center_x = w // 2
+    center_y = h // 2
 
-    # Convert the average color to grayscale brightness.
-    # brightness = 0.114 * b + 0.587 * g + 0.299 * r
-    brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b  # Using ITU-R BT.709 for better perceptual brightness estimation.
-    return (b, g, r), float(brightness)
+    radius = int(min(w, h) * 0.35)
 
+    mask = np.zeros((h, w), dtype=np.uint8)
+
+    cv2.circle(
+        mask,
+        (center_x, center_y),
+        radius,
+        255,
+        -1
+    )
+
+    mean_bgr = cv2.mean(roi, mask=mask)[:3]
+
+    b, g, r = mean_bgr
+
+    brightness = (
+        0.2126 * r +
+        0.7152 * g +
+        0.0722 * b
+    )
+
+    return (b, g, r), brightness
 
 def classify_checkers_by_brightness(
     image: np.ndarray,
@@ -93,7 +109,7 @@ def classify_checkers_by_brightness(
         if roi is None or roi.size == 0:
             continue
 
-        avg_bgr, brightness = compute_average_bgr_and_brightness(roi)
+        avg_bgr, brightness = compute_checker_color(roi)
         brightness_values.append([brightness])
         valid_indices.append(index)
         results[index] = CheckerResult(

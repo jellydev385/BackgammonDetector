@@ -374,7 +374,7 @@ class BackgammonCV:
                 checker_result = checker_results[i]
                 if self.detector.class_numbers[i] >= 6:
 
-                    print(f"Checker at {self.detector.centers[i]} classified as {checker_result.label} with brightness {checker_result.brightness:.2f} and average BGR {checker_result.average_bgr}")
+                    # print(f"Checker at {self.detector.centers[i]} classified as {checker_result.label} with brightness {checker_result.brightness:.2f} and average BGR {checker_result.average_bgr}")
                     if checker_result.label == "white":
                         self.detector.class_numbers[i] = Class.DISK_WHITE
                     else:
@@ -407,6 +407,7 @@ class BackgammonCV:
             self.overlay = self.detector.drawResult()
             self.transparent_overlay = self.detector.drawBboxs()
 
+            self.board.calibratePoints()
             self.board_scene.updateBoard(self.board)
             # save board state in snapshots
             if( self.prev_board != self.board ):

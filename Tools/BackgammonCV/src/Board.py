@@ -71,6 +71,53 @@ class Board:
         return board
         # return copy.deepcopy(self)
 
+    def calibratePoints(self):
+        """
+        Ensure all disks on each point have the same color.
+
+        If a point contains mixed colors, choose the winning color using
+        confidence-weighted voting:
+          - Sum confidence for WHITE disks
+          - Sum confidence for BLACK disks
+        The larger total wins and all disks on that point are set to that color.
+        """
+        for point in self.points:
+            if len(point.disks) <= 1:
+                continue
+
+            # If all disks are already equal in color, no calibration is needed.
+            colors = [disk.color for disk in point.disks]
+            if all(c == colors[0] for c in colors):
+                continue
+
+            white_conf = 0.0
+            black_conf = 0.0
+            best_white_conf = -1.0
+            best_black_conf = -1.0
+
+            for disk in point.disks:
+                conf = float(disk.confidence)
+                if disk.color == Color.WHITE:
+                    white_conf += conf
+                    if conf > best_white_conf:
+                        best_white_conf = conf
+                else:
+                    black_conf += conf
+                    if conf > best_black_conf:
+                        best_black_conf = conf
+
+            # Primary rule: confidence sum vote.
+            # Tie-breaker: the side with the highest single-disk confidence wins.
+            if white_conf > black_conf:
+                target_color = Color.WHITE
+            elif black_conf > white_conf:
+                target_color = Color.BLACK
+            else:
+                target_color = Color.WHITE if best_white_conf >= best_black_conf else Color.BLACK
+
+            for disk in point.disks:
+                disk.color = target_color
+
     def __eq__(self, other):
         return (isinstance(other, Board)
                 and self.points == other.points 
