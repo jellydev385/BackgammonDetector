@@ -65,6 +65,13 @@ class BackgammonCV:
 
         self.board = Board()
         self.prev_board = Board()
+        # Stability filtering
+        self.candidate_board = None
+        self.candidate_count = 0
+
+        # Require board to remain stable for N frames
+        self.STABLE_FRAMES = 1
+
         self.movements = []
         self.board_scene = 0
 
@@ -123,7 +130,7 @@ class BackgammonCV:
         hsv[:, :, 2] = clahe.apply(hsv[:, :, 2])
         enhanced = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-        # Run inference on GPU
+        # Run yolov11 inference the board on GPU
         results = model.predict(
             source=enhanced,
             conf=0.25
@@ -187,13 +194,13 @@ class BackgammonCV:
         self.overlay_text = self.frame.copy()
 
         self.board.bbox = self.points_homography.copy()
-        print(f"board.bbox: {self.board.bbox}")
+        # print(f"board.bbox: {self.board.bbox}")
 
         # Draw
         if( len(self.points_homography) == NUM_POINT_HOMOGRAPHY ):
             for cords in self.points_homography:
                 x, y = cords
-                print(f"cords: {cords}")
+                # print(f"cords: {cords}")
                 cv2.circle(self.overlay_text, (x, y), 2, (0, 0, 255), 2)
 
             # MATRIX TRANFORM --------------------------------------------------------------
@@ -342,6 +349,167 @@ class BackgammonCV:
         self.detect_thread = threading.Thread(target=self.detect, args=(image,))
         self.detect_thread.start()
 
+    def getMovedCheckers(self, previous_points, current_points):
+        """
+        Compare two Point() arrays and infer moved checkers.
+
+        Returns:
+            {
+                "white": [{"from": <point_id>, "to": <point_id>}],
+                "black": [{"from": <point_id>, "to": <point_id>}],
+                "unmatched": {
+                    "white": {"from": [<point_id>], "to": [<point_id>]},
+                    "black": {"from": [<point_id>], "to": [<point_id>]}
+                }
+            }
+
+        Notes:
+        - Point id 25 is the bar.
+        - Movement is inferred from checker count differences per color, because
+          individual checkers do not have stable IDs.
+        """
+        def _count_by_color(points):
+            counts = {}
+            for point in points:
+                white_count = 0
+                black_count = 0
+                for disk in point.disks:
+                    if disk.color == Color.WHITE:
+                        white_count += 1
+                    else:
+                        black_count += 1
+                counts[point.id] = {
+                    "white": white_count,
+                    "black": black_count,
+                }
+            return counts
+
+        prev_counts = _count_by_color(previous_points)
+        curr_counts = _count_by_color(current_points)
+        all_point_ids = sorted(set(prev_counts.keys()) | set(curr_counts.keys()))
+
+        result = {
+            "white": [],
+            "black": [],
+            "unmatched": {
+                "white": {"from": [], "to": []},
+                "black": {"from": [], "to": []},
+            },
+        }
+
+        for color_name in ("white", "black"):
+            from_points = []
+            to_points = []
+
+            for point_id in all_point_ids:
+                prev_value = prev_counts.get(point_id, {}).get(color_name, 0)
+                curr_value = curr_counts.get(point_id, {}).get(color_name, 0)
+                # print(f"point_id: {point_id} color: {color_name} prev_value: {prev_value} curr_value: {curr_value}")
+                delta = curr_value - prev_value
+
+                if delta < 0:
+                    from_points.extend([point_id] * (-delta))
+                elif delta > 0:
+                    to_points.extend([point_id] * delta)
+
+            paired_moves = min(len(from_points), len(to_points))
+            for i in range(paired_moves):
+                result[color_name].append({
+                    "from": from_points[i],
+                    "to": to_points[i],
+                })
+
+            if len(from_points) > paired_moves:
+                result["unmatched"][color_name]["from"] = from_points[paired_moves:]
+            if len(to_points) > paired_moves:
+                result["unmatched"][color_name]["to"] = to_points[paired_moves:]
+
+        return result
+
+    def processStableBoard(self, stable_board):
+
+        # Ignore identical board
+        if stable_board.points == self.prev_board.points:
+            print("Stable board identical to previous board, ignoring.")
+            return
+
+        moved = self.getMovedCheckers(
+            self.prev_board.points,
+            stable_board.points
+        )
+
+        if len(moved['white']) > 0:
+            print("\t\twhite moved from " + str(moved['white'][0]['from']) + " to " + str(moved['white'][0]['to']))
+            stable_board.player = Color.WHITE
+            if len(stable_board.dices) > 0 and stable_board.is_dice_changed(self.prev_board) and stable_board.player != self.prev_board.player:
+                stable_board.turn = self.prev_board.turn + 1
+            else:
+                stable_board.turn = self.prev_board.turn
+                stable_board.dices = self.prev_board.dices.copy()
+
+        elif len(moved['black']) > 0:
+            print("\t\tblack moved from " + str(moved['black'][0]['from']) + " to " + str(moved['black'][0]['to']))
+            stable_board.player = Color.BLACK
+            if len(stable_board.dices) > 0 and stable_board.is_dice_changed(self.prev_board) and stable_board.player != self.prev_board.player:
+                stable_board.turn = self.prev_board.turn + 1
+            else:
+                stable_board.turn = self.prev_board.turn
+                stable_board.dices = self.prev_board.dices.copy()
+
+        # else:
+        #     return
+
+        self.movements.append(stable_board.copy())
+
+        with open(f"frame_{self.frame_index}.txt", "w") as f:
+            f.write(stable_board.exportJSON(as_string=True))
+
+        self.prev_board = stable_board.copy()
+
+        print(
+            f"\tStable board accepted. "
+            f"Turn={stable_board.turn}, "
+            f"Player={stable_board.player}"
+        )
+    
+    def updateStableBoard(self):
+
+        # if len(self.board.dices) < 2:
+        #     return
+        
+        if not self.board.is_board_normal():
+            print("Board not normal, ignoring.")
+            return
+
+        # First candidate
+        if self.candidate_board is None:
+            print("First candidate board")
+            self.candidate_board = self.board.copy()
+            self.candidate_count = 1
+            # return
+
+        # Same as candidate
+        if self.board.points == self.candidate_board.points:
+            print("Candidate board stable for another frame")
+            self.candidate_count += 1
+        else:
+            # New candidate board
+            print("New candidate board")
+            self.candidate_board = self.board.copy()
+            self.candidate_count = 1
+
+        # Candidate accepted
+        if self.candidate_count >= self.STABLE_FRAMES:
+
+            print("Board stable for " + str(self.candidate_count) + " frames, accepting.")
+
+            self.processStableBoard(self.candidate_board)
+
+            # Prevent reprocessing same state
+            self.candidate_count = 0
+        else:
+            print("Board not stable yet: candidate_count = " + str(self.candidate_count))
+
     def detect(self, image):
 
         while True:
@@ -349,10 +517,10 @@ class BackgammonCV:
                 print("\nFirst you need to align the template. Click clockwise on the 4 extreme points of the board starting from the top left one\n")
                 return
 
-            if self.isPlaying:
-                self.bar.goto(self.frame_index + 1)
-            else:
-                self.board_scene.detecting()
+            # if self.isPlaying:
+            #     self.bar.goto(self.frame_index + 1)
+            # else:
+            #     self.board_scene.detecting()
 
             # if isinstance(image, str):
             #     self.frame = cv2.imread(image)
@@ -410,15 +578,9 @@ class BackgammonCV:
 
             self.board.calibratePoints()
             self.board_scene.updateBoard(self.board)
+            
             # save board state in snapshots
-            if self.board.is_board_normal() and self.board.points != self.prev_board.points:
-                text_file = open(f"frame_{self.frame_index}.txt", "w")
-                s = self.board.exportJSON(as_string=True)
-                text_file.write(s)
-                text_file.close()
-                self.prev_board = self.board.copy()
-                # add to movements
-                self.movements.append(self.board.copy())
+            self.updateStableBoard()
 
             # Add snapshot
             snapshot = Snapshot(self.frame_index, self.board.copy(), self.frame.copy(), self.transparent_overlay.copy())

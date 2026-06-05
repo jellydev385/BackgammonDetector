@@ -31,6 +31,8 @@ class Board:
 
     def addDice(self, dice):
         # check if the detected dice is on the board
+        if len(self.dices) >= 2:
+            return
         if pointInPoly(dice.center, self.bbox):
             self.dices.append(dice)
 
@@ -62,6 +64,14 @@ class Board:
         for point in self.points:
             res += str(point) + "\n"
         return res
+    
+    def is_dice_changed(self, other):
+        if len(self.dices) != len(other.dices):
+            return True
+        for dice in self.dices:
+            if dice not in other.dices:
+                return True
+        return False
 
     def copy(self):
         board = Board()
@@ -71,6 +81,9 @@ class Board:
             board.addPoint(newPoint)
 
         board.dices = self.dices.copy()
+        board.turn = self.turn
+        board.player = self.player
+        board.cube = self.cube
         return board
         # return copy.deepcopy(self)
 
