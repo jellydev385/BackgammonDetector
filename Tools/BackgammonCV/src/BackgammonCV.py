@@ -65,6 +65,7 @@ class BackgammonCV:
 
         self.board = Board()
         self.prev_board = Board()
+        self.movements = []
         self.board_scene = 0
 
         self.p_min = 0.2
@@ -410,13 +411,14 @@ class BackgammonCV:
             self.board.calibratePoints()
             self.board_scene.updateBoard(self.board)
             # save board state in snapshots
-            if( self.prev_board != self.board ):
-                # print(f"Current: {str(self.board)}")
+            if self.board.is_board_normal() and self.board.points != self.prev_board.points:
                 text_file = open(f"frame_{self.frame_index}.txt", "w")
-                s = str(self.board) + "\n"
+                s = self.board.exportJSON(as_string=True)
                 text_file.write(s)
                 text_file.close()
                 self.prev_board = self.board.copy()
+                # add to movements
+                self.movements.append(self.board.copy())
 
             # Add snapshot
             snapshot = Snapshot(self.frame_index, self.board.copy(), self.frame.copy(), self.transparent_overlay.copy())

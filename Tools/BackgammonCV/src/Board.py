@@ -124,7 +124,90 @@ class Board:
             for disk in point.disks:
                 disk.color = target_color
 
-    def exportJSON(self, total_checkers_per_player=15, as_string=False, indent=2):
+    def are_all_checkers_on_home_board(self, color):
+        """
+        Check if all checkers of the given color on the board are on their home board.
+
+        White home board: points 1-6
+        Black home board: points 19-24
+
+        Args:
+            color: Color.WHITE or Color.BLACK
+
+        Returns:
+            True if all checkers of this color on the board are in the home board.
+            False if any checker is on the board but outside the home board or on the bar.
+        """
+        if color == Color.WHITE:
+            home_board_range = range(1, 7)  # points 1-6
+        elif color == Color.BLACK:
+            home_board_range = range(19, 25)  # points 19-24
+        else:
+            return False
+
+        points_by_id = {point.id: point for point in self.points}
+
+        # Check all points outside the home board
+        for point_id in range(1, 25):
+            if point_id in home_board_range:
+                continue  # Skip home board points
+            
+            point = points_by_id.get(point_id)
+            if point is not None:
+                for disk in point.disks:
+                    if disk.color == color:
+                        return False  # Found a checker outside home board
+
+        # Also check the bar (point 25)
+        bar_point = points_by_id.get(25)
+        if bar_point is not None:
+            for disk in bar_point.disks:
+                if disk.color == color:
+                    return False  # Found a checker on the bar
+
+        return True
+
+    def are_all_white_on_home_board(self):
+        """Check if all white checkers are on their home board (points 1-6)."""
+        return self.are_all_checkers_on_home_board(Color.WHITE)
+
+    def are_all_black_on_home_board(self):
+        """Check if all black checkers are on their home board (points 19-24)."""
+        return self.are_all_checkers_on_home_board(Color.BLACK)
+
+    def is_board_normal(self):
+        """
+        Check if the board status is normal.
+
+        Rules:
+        - If the total count of checkers is 30, the board is normal.
+        - If all checkers are on the player's home board, the board is normal (bearing off phase).
+        - If all checkers are NOT on the home board AND the count is not 30, the board is abnormal.
+
+        Returns:
+            True if the board status is normal, False otherwise.
+        """
+        # Count total checkers on the board
+        points_by_id = {point.id: point for point in self.points}
+        total_checkers = 0
+
+        for point_id in range(1, 26):  # Include all points 1-24 and bar (25)
+            point = points_by_id.get(point_id)
+            if point is not None:
+                total_checkers += len(point.disks)
+
+        # If all 30 checkers are present, board is normal
+        if total_checkers == 30:
+            return True
+
+        # If all checkers are on home boards, board is normal (bearing off phase)
+        if self.are_all_white_on_home_board() and self.are_all_black_on_home_board():
+            return True
+
+        # Otherwise, board is abnormal (missing checkers or in invalid state)
+        return False
+
+    def exportJSON(self, as_string=False):
         """
         Export board state using the requested schema.
 
@@ -177,9 +260,16 @@ class Board:
                 else:
                     bar_black += 1
 
-        # Borne-off pieces are inferred from total pieces per player.
-        borne_off_white = max(0, int(total_checkers_per_player) - white_on_board - bar_white)
-        borne_off_black = max(0, int(total_checkers_per_player) - black_on_board - bar_black)
+        # Borne-off pieces: only count as borne-off if all checkers are on the home board.
+        if self.are_all_white_on_home_board():
+            borne_off_white = max(0, 15 - white_on_board - bar_white)
+        else:
+            borne_off_white = 0
+
+        if self.are_all_black_on_home_board():
+            borne_off_black = max(0, 15 - black_on_board - bar_black)
+        else:
+            borne_off_black = 0
 
         state = {
             "turn": int(self.turn),
@@ -198,7 +288,7 @@ class Board:
         }
 
         if as_string:
-            return json.dumps(state, indent=indent)
+            return json.dumps(state, indent=2)
         return state
 
     def __eq__(self, other):
