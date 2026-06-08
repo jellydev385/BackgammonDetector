@@ -9,8 +9,9 @@ if __name__ == "__main__":
 
     bCV = BackgammonCV()
 
-    # bCV.video = cv2.VideoCapture("../data/videos/Backgamon game 5.mp4")
-    bCV.video = cv2.VideoCapture("../data/videos/test.mp4")
+    # bCV.video = cv2.VideoCapture("../data/videos/Backgamon game 6.mp4")
+    bCV.video = cv2.VideoCapture("../data/videos/bearoff2.mp4")
+    # bCV.video = cv2.VideoCapture("../data/videos/test.mp4")
 
     bCV.total_frames = int(bCV.video.get(cv2.CAP_PROP_FRAME_COUNT))
     bCV.bar.max = bCV.total_frames
@@ -41,15 +42,19 @@ if __name__ == "__main__":
     bCV.video.set(1, 0)
     ret, bCV.frame = bCV.video.read()
 
+    if not ret:
+        print("Failed to read video")
+        exit()
+
     bCV.alignTemplate(bCV.frame)
 
     keyboard.on_press_key("esc", lambda _: exit())
     keyboard.on_press_key("right arrow", lambda _: bCV.nextFrame())
     keyboard.on_press_key("left arrow", lambda _: bCV.previousFrame())
-    keyboard.on_press_key("enter", lambda _: bCV.detectThread(bCV.frame))
-    keyboard.on_press_key("space", lambda _: bCV.togglePlay())
+    # keyboard.on_press_key("enter", lambda _: bCV.detectThread(bCV.frame))
+    # keyboard.on_press_key("space", lambda _: bCV.togglePlay())
+    # keyboard.on_press_key("s", lambda _: bCV.saveMovements())
     # keyboard.on_press_key("r", lambda _: bCV.replayThread())
-    # keyboard.on_press_key("s", lambda _: bCV.saveSnapshots())
     # keyboard.on_press_key("l", lambda _: bCV.loadSnapshots())
     # keyboard.on_press_key("v", lambda _: bCV.saveReplay())
 
@@ -59,8 +64,25 @@ if __name__ == "__main__":
             exit()
 
         if key & 0xFF == ord("q"):
-            cv2.destroyAllWindows()
+            bCV.saveMovements()
+            bCV.close()
+            exit(0)
             break
-
+        if key & 0xFF == ord("s"):
+            bCV.saveMovements()
+        if key & 0xFF == ord(" "):  # space
+            bCV.togglePlay()
+        if key & 0xFF == 0x0d:  # enter
+            bCV.detectThread(bCV.frame)
+        if key == 2424832:      # Left arrow
+            bCV.previousFrame()
+        if key == 2555904:      # Right arrow
+            bCV.nextFrame()
+        if key == 27:            # esc
+            bCV.saveMovements()
+            bCV.close()
+            exit(0)
+            break
+            
     # if key == 32:
     # print("esc")

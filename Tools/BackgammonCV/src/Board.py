@@ -1,5 +1,6 @@
 import random
 from Color import Color
+from Cube import Cube
 from Disk import Disk
 from Utils import pointInPoly
 from BoardPosition import BoardPosition
@@ -13,8 +14,9 @@ class Board:
         self.points = []
         self.dices = []
         self.turn = 0
-        self.player = Color.BLACK
-        self.cube = 0
+        self.player = None
+        self.cube = None
+        self.cube_owner = None
 
     def reset(self):
         self.clear()
@@ -25,6 +27,7 @@ class Board:
         for point in self.points:
             point.clear()
         self.dices.clear()
+        self.player = None
 
     def addPoint(self, point):
         self.points.append(point)
@@ -33,6 +36,10 @@ class Board:
         # check if the detected dice is on the board
         if len(self.dices) >= 2:
             return
+        
+        if pointInPoly(dice.center, self.points[len(self.points) - 1].bbox_warped):
+            return
+        
         if pointInPoly(dice.center, self.bbox):
             self.dices.append(dice)
 
@@ -43,6 +50,9 @@ class Board:
             if pointInPoly(disk.center, point.bbox_warped):
                 # TODO: dtermine color clustering
                 point.addDisk(disk)
+
+    def setCube(self, cube):
+        self.cube = cube
 
     # def updateDicesBoardPosition(self):
     #     center_bar = self.getBar().center[0]
@@ -61,6 +71,10 @@ class Board:
         for dice in self.dices:
             res += str(dice) + " "
         res += "\n"
+        res += "turn: " + str(self.turn) + "\n"
+        res += "player: " + str(self.player) + "\n"
+        res += "cube: " + str(self.cube) + "\n"
+        res += "cube_owner: " + str(self.cube_owner) + "\n"
         for point in self.points:
             res += str(point) + "\n"
         return res
@@ -79,11 +93,15 @@ class Board:
         for point in self.points:
             newPoint = point.copy()
             board.addPoint(newPoint)
-
-        board.dices = self.dices.copy()
+        
+        for dice in self.dices:
+            newDice = dice.copy()
+            board.addDice(newDice)
+            
         board.turn = self.turn
         board.player = self.player
         board.cube = self.cube
+        board.cube_owner = self.cube_owner
         return board
         # return copy.deepcopy(self)
 
@@ -161,7 +179,7 @@ class Board:
         points_by_id = {point.id: point for point in self.points}
 
         # Check all points outside the home board
-        for point_id in range(1, 25):
+        for point_id in range(1, 26):  # Check points 1-24 and bar (25)
             if point_id in home_board_range:
                 continue  # Skip home board points
             
@@ -171,14 +189,34 @@ class Board:
                     if disk.color == color:
                         return False  # Found a checker outside home board
 
-        # Also check the bar (point 25)
-        bar_point = points_by_id.get(25)
-        if bar_point is not None:
-            for disk in bar_point.disks:
-                if disk.color == color:
-                    return False  # Found a checker on the bar
+        # # Also check the bar (point 25)
+        # bar_point = points_by_id.get(25)
+        # if bar_point is not None:
+        #     for disk in bar_point.disks:
+        #         if disk.color == color:
+        #             return False  # Found a checker on the bar
 
         return True
+    
+    def get_count_on_points(self, color):
+        """
+        Get the total count of checkers of the given color on the points (excluding borne-off).
+
+        Args:
+            color: Color.WHITE or Color.BLACK
+
+        Returns:
+            Total count of checkers of this color on the points.
+        """
+        count = 0
+        for point in self.points:
+            # if point.id == 25:  # Skip bar point
+            #     continue
+            
+            for disk in point.disks:
+                if disk.color == color:
+                    count += 1
+        return count
 
     def are_all_white_on_home_board(self):
         """Check if all white checkers are on their home board (points 1-6)."""
@@ -187,38 +225,6 @@ class Board:
     def are_all_black_on_home_board(self):
         """Check if all black checkers are on their home board (points 19-24)."""
         return self.are_all_checkers_on_home_board(Color.BLACK)
-
-    def is_board_normal(self):
-        """
-        Check if the board status is normal.
-
-        Rules:
-        - If the total count of checkers is 30, the board is normal.
-        - If all checkers are on the player's home board, the board is normal (bearing off phase).
-        - If all checkers are NOT on the home board AND the count is not 30, the board is abnormal.
-
-        Returns:
-            True if the board status is normal, False otherwise.
-        """
-        # Count total checkers on the board
-        points_by_id = {point.id: point for point in self.points}
-        total_checkers = 0
-
-        for point_id in range(1, 26):  # Include all points 1-24 and bar (25)
-            point = points_by_id.get(point_id)
-            if point is not None:
-                total_checkers += len(point.disks)
-
-        # If all 30 checkers are present, board is normal
-        if total_checkers == 30:
-            return True
-
-        # If all checkers are on home boards, board is normal (bearing off phase)
-        if self.are_all_white_on_home_board() and self.are_all_black_on_home_board():
-            return True
-
-        # Otherwise, board is abnormal (missing checkers or in invalid state)
-        return False
 
     def exportJSON(self, as_string=False):
         """
@@ -286,9 +292,9 @@ class Board:
 
         state = {
             "turn": int(self.turn),
-            "player": "white" if self.player == Color.WHITE else "black",
+            "player": "None" if self.player is None else "white" if self.player == Color.WHITE else "black",
             "dice": [int(dice.value) for dice in self.dices],
-            "cube": int(self.cube),
+            "cube": int(self.cube.value) if self.cube is not None else 1,
             "points": points_json,
             "bar": {
                 "white": bar_white,
@@ -307,4 +313,5 @@ class Board:
     def __eq__(self, other):
         return (isinstance(other, Board)
                 and self.points == other.points 
-                and self.dices == other.dices)
+                and self.dices == other.dices
+                and self.cube == other.cube)

@@ -31,3 +31,7 @@ class Dice:
                 and self.id == other.id 
                 and self.board_position == other.board_position 
                 and self.color == other.color)
+    
+    def copy(self):
+        dice = Dice(self.id, self.center, self.confidence, self.board_position, self.color)
+        return dice

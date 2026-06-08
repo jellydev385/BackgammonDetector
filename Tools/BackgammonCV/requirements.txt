@@ -3,3 +3,6 @@ shapely
 pygame
 progress
 keyboard
+scikit_learn
+ultralytics
+mediapipe

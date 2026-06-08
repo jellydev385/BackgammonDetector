@@ -24,6 +24,7 @@ class Detector:
         self.class_numbers = []
         self.centers = []
         self.dice_model = YOLO("dice_model.pt")
+        self.cube_model = YOLO("cube_model.pt")
 
         self.image_size = (608, 608)
 
@@ -57,7 +58,7 @@ class Detector:
         # print("Detecting...")
         self.loadImage(image)
         self.network.setInput(self.blob)
-        self.network_output = self.network.forward(self.layers)
+        network_output = self.network.forward(self.layers)
 
         temp_class_numbers = []
         temp_confidences = []
@@ -67,7 +68,7 @@ class Detector:
         temp_class_numbers = []
 
         # Going through all output layers after feed forward pass
-        for result in self.network_output:
+        for result in network_output:
             for detected_objects in result:
                 scores = detected_objects[5:]
                 class_current = np.argmax(scores)
@@ -111,6 +112,26 @@ class Detector:
                     temp_bounding_boxes.append((int(x1), int(y1), int(x2-x1), int(y2-y1)))
         # print("Dice detection completed\n")
 
+        # Cube detection using yolov26
+        results = self.cube_model.predict(source=image, conf=self.p_min, verbose=False)
+        if results:
+            r = results[0]
+            if hasattr(r, "boxes") and r.boxes is not None and len(r.boxes) != 0:
+                boxes = r.boxes
+                xyxy = boxes.xyxy.detach().cpu().numpy()
+                cls_ids = boxes.cls.detach().cpu().numpy().astype(int)
+                confs = boxes.conf.detach().cpu().numpy()
+
+                for cls_id in cls_ids:
+                    temp_class_numbers.append(cls_id + 8)  # Cube class ids start from 8
+                for conf in confs:
+                    temp_confidences.append(conf)
+                for x1, y1, x2, y2 in xyxy:
+                    # cx = (x1 + x2) // 2
+                    # cy = (y1 + y2) // 2
+                    # self.centers.append((cx, cy))
+                    temp_bounding_boxes.append((int(x1), int(y1), int(x2-x1), int(y2-y1)))
+
         self.results = cv2.dnn.NMSBoxes(temp_bounding_boxes, temp_confidences, self.p_min, self.threshold_nms)
 
         if len(self.results) > 0:
@@ -132,6 +153,8 @@ class Detector:
                 self.confidences.append(temp_confidences[i])
 
         # print("Detection(yolov4) complete\n")
+        self.blob = 0
+        self.network_output = 0
         return self.results, self.class_numbers, self.confidences, self.bounding_boxes, self.centers
 
     def drawResult(self):
@@ -151,7 +174,7 @@ class Detector:
 
                 # Drawing bounding box on the original image
                 cv2.rectangle(image, (x_min, y_min), (x_min + box_width, y_min + box_height), colour_box_current, 1)
-                if self.class_numbers[i] >= 6:
+                if self.class_numbers[i] >= 6 and self.class_numbers[i] < 8:  # Disk classes
                     cv2.circle(image, (x_center, y_center), 2, (255, 255, 255), 2)
 
                 # Preparing text with label and confidence for current bounding box

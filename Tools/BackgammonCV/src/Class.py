@@ -13,3 +13,11 @@ class Class:
     DISK_BLACK = 6
     DISK_WHITE = 7
     DISKS = DISK_WHITE
+
+    CUBE_16 = 8
+    CUBE_2 = 9
+    CUBE_4 = 10
+    CUBE_64 = 11
+    CUBE_8 = 12
+    CUBE_32 = 13
+    CUBES = CUBE_32
