@@ -37,7 +37,7 @@ class Board:
         if len(self.dices) >= 2:
             return
         
-        if pointInPoly(dice.center, self.points[len(self.points) - 1].bbox_warped):
+        if pointInPoly(dice.center, self.getBar().bbox_warped):
             return
         
         if pointInPoly(dice.center, self.bbox):

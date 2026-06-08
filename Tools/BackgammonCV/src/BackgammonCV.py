@@ -601,7 +601,9 @@ class BackgammonCV:
                 print("\t\t[processStableBoard] both white and black moved, ignoring.")
                 self.prev_board = stable_board.copy()
                 return
-            
+
+            print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
+
             # if len(stable_board.dices) == 2 and stable_board.is_dice_changed(self.prev_board) and stable_board.player != self.prev_board.player:
             if stable_board.player != self.prev_board.player:
                 stable_board.turn = self.prev_board.turn + 1
@@ -614,6 +616,8 @@ class BackgammonCV:
         elif len(moved['white']) > 0:
             print("\t\t[processStableBoard] white moved from " + str(moved['white'][0]['from']) + " to " + str(moved['white'][0]['to']))
             stable_board.player = Color.WHITE
+
+            print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
             # if len(stable_board.dices) == 2 and stable_board.is_dice_changed(self.prev_board) and stable_board.player != self.prev_board.player:
             if stable_board.player != self.prev_board.player:
                 stable_board.turn = self.prev_board.turn + 1
@@ -626,6 +630,8 @@ class BackgammonCV:
         elif len(moved['black']) > 0:
             print("\t\t[processStableBoard] black moved from " + str(moved['black'][0]['from']) + " to " + str(moved['black'][0]['to']))
             stable_board.player = Color.BLACK
+
+            print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
             # if len(stable_board.dices) == 2 and stable_board.is_dice_changed(self.prev_board) and stable_board.player != self.prev_board.player:
             if stable_board.player != self.prev_board.player:
                 stable_board.turn = self.prev_board.turn + 1
@@ -642,6 +648,8 @@ class BackgammonCV:
                 stable_board.player = Color.WHITE
             elif len(moved['unmatched']['black']['from']) > 0:
                 stable_board.player = Color.BLACK
+
+            print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
             stable_board.turn = self.prev_board.turn + 1
             if len(stable_board.dices) < 2:
                 stable_board.dices = self.prev_board.dices.copy()
@@ -650,6 +658,8 @@ class BackgammonCV:
             print("\t\t[processStableBoard] unmatched movement to, could be due to hidden checkers coming back or detection error, resuming.")
             stable_board.player = self.prev_board.player
             stable_board.turn = self.prev_board.turn - 1 if self.prev_board.turn > 0 else 0
+
+            print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
             if len(stable_board.dices) < 2:
                 stable_board.dices = self.prev_board.dices.copy()
 
@@ -657,6 +667,8 @@ class BackgammonCV:
             return
         else:
             print("\t\t[processStableBoard] No movement detected, ignoring.")
+
+            print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
             return
         
         self.movements.append(stable_board.copy())
@@ -777,6 +789,7 @@ class BackgammonCV:
             self.board.dices = []  # self.board.clear()
 
             checker_results = classify_checkers_by_brightness(self.frame, self.detector.bounding_boxes)
+            print(f"[detect] self.detector.centers #: {len(self.detector.centers)}, self.detector.class_numbers #: {len(self.detector.class_numbers)}")
             # Generate objects from YOLO detection ---------------------------------------------------------------
             for i in range(len(self.detector.centers)):
                 checker_result = checker_results[i]
@@ -949,6 +962,8 @@ class BackgammonCV:
                 return
             if not self.isPlaying:
                 cv2.imshow("Source", self.frame)
+
+            self.saveMovements()
             # time.sleep(3)
             # self.saveSnapshots()
             # self.bar.finish()

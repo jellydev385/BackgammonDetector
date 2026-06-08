@@ -29,6 +29,7 @@ class Point:
 
     def copy(self):
         point = Point(self.id, self.center, self.bbox.copy())
+        point.bbox_warped = self.bbox_warped.copy()
         for disk in self.disks:
             newDisk = disk.copy()
             point.addDisk(newDisk)
