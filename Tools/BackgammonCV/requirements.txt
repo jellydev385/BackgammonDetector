@@ -5,4 +5,4 @@ progress
 keyboard
 scikit_learn
 ultralytics
-mediapipe
+mediapipe==0.10.9
