@@ -1,33 +1,20 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
-class Point(BaseModel):
-    x: float
-    y: float
-
-
-class BoundingBox(BaseModel):
-    x: float
-    y: float
-    width: float
-    height: float
-
-
-class Piece(BaseModel):
-    id: str
-    color: str           # "white" | "black"
-    point: int           # backgammon point (1-24), 0=bar, 25=off
-    bounding_box: BoundingBox
-    confidence: float
+class CheckerCount(BaseModel):
+    white: int
+    black: int
 
 
 class FrameResult(BaseModel):
-    frame_index: int
-    timestamp_sec: float
-    pieces: List[Piece]
-    board_bounding_box: Optional[BoundingBox] = None
-    raw_image_base64: Optional[str] = None  # optional: annotated frame
+    turn: int
+    player: str
+    dice: List[int]
+    cube: int
+    points: Dict[str, CheckerCount]
+    bar: CheckerCount
+    borne_off: CheckerCount
 
 
 class DetectionResponse(BaseModel):
