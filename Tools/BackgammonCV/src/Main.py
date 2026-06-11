@@ -9,8 +9,8 @@ if __name__ == "__main__":
 
     bCV = BackgammonCV()
 
-    # bCV.video = cv2.VideoCapture("../data/videos/Backgamon game 6.mp4")
-    bCV.video = cv2.VideoCapture("../data/videos/bearoff2.mp4")
+    bCV.video = cv2.VideoCapture("../data/videos/Backgamon game 12.mp4")
+    # bCV.video = cv2.VideoCapture("../data/videos/bearoff2.mp4")
     # bCV.video = cv2.VideoCapture("../data/videos/test.mp4")
 
     bCV.total_frames = int(bCV.video.get(cv2.CAP_PROP_FRAME_COUNT))

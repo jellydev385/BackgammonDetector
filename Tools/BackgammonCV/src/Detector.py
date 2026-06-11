@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 from ultralytics import YOLO
+import torch
 
 from Constants import CLASS_COLORS
 
@@ -45,7 +46,19 @@ class Detector:
     # self.colors = colors
 
     def __loadNetwork(self):
+
+        print(cv2.getBuildInformation())
         self.network = cv2.dnn.readNetFromDarknet("../data/cfg/yolov4.cfg", "../data/cfg/yolov4.weights")
+        
+        if cv2.cuda.getCudaEnabledDeviceCount() > 0:
+            print("[INFO] Using GPU (CUDA)")
+            self.network.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+            self.network.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+        else:
+            print("[INFO] CUDA not available — using CPU")
+            self.network.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+            self.network.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+
         self.layers = self.network.getLayerNames()
         self.layers = [self.layers[i - 1] for i in self.network.getUnconnectedOutLayers()]
 
@@ -92,7 +105,11 @@ class Detector:
                     temp_class_numbers.append(class_current)
         
         # Deteting Dices using yolov11
-        results = self.dice_model.predict(source=image, conf=self.p_min, verbose=False)
+        if torch.cuda.is_available():
+            results = self.dice_model.predict(source=image, conf=self.p_min, device=0, verbose=False)
+        else:
+            results = self.dice_model.predict(source=image, conf=self.p_min, verbose=False)
+
         if results:
             r = results[0]
             if hasattr(r, "boxes") and r.boxes is not None and len(r.boxes) != 0:
@@ -113,7 +130,11 @@ class Detector:
         # print("Dice detection completed\n")
 
         # Cube detection using yolov26
-        results = self.cube_model.predict(source=image, conf=self.p_min, verbose=False)
+        if torch.cuda.is_available():
+            results = self.cube_model.predict(source=image, conf=self.p_min, device=0, verbose=False)
+        else:
+            results = self.cube_model.predict(source=image, conf=self.p_min, verbose=False)
+            
         if results:
             r = results[0]
             if hasattr(r, "boxes") and r.boxes is not None and len(r.boxes) != 0:

@@ -223,11 +223,18 @@ class BackgammonCV:
         enhanced = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
         # Run yolov11 inference the board on GPU
-        results = model.predict(
-            source=enhanced,
-            conf=0.25
-        )
-        
+        if torch.cuda.is_available():
+            results = model.predict(
+                source=enhanced,
+                device=0,
+                conf=0.25
+            )
+        else:
+            results = model.predict(
+                source=enhanced,
+                conf=0.25
+            )
+
         # Get bounding boxes in xyxy format
         result = results[0]
         class_names = model.names
@@ -826,11 +833,12 @@ class BackgammonCV:
                 # CUBE
                 if self.detector.class_numbers[i] >= Class.CUBE_16 and self.detector.class_numbers[i] <= Class.CUBE_32:
                     newCube = Cube(self.detector.class_numbers[i] - Class.CUBE_16, self.detector.centers[i], self.detector.confidences[i])
-                    if newCube.center[1] < self.board.getBar().bbox_warped[0][0][1] / 4:
+                    if newCube.center[1] < self.board.getBar().bbox_warped[0][0][1] + (self.board.getBar().bbox_warped[2][0][1] - self.board.getBar().bbox_warped[0][0][1]) / 4:
                         newCube.owner = Color.WHITE
-                    elif newCube.center[1] > self.board.getBar().bbox_warped[0][0][1] * 3 / 4:
+                        self.board.setCube(newCube)
+                    elif newCube.center[1] > self.board.getBar().bbox_warped[0][0][1] + (self.board.getBar().bbox_warped[2][0][1] - self.board.getBar().bbox_warped[0][0][1]) * 3 / 4:
                         newCube.owner = Color.BLACK
-                    self.board.setCube(newCube)
+                        self.board.setCube(newCube)
 
             self.overlay = self.detector.drawResult()
             self.transparent_overlay = self.detector.drawBboxs()
