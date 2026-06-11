@@ -28,6 +28,7 @@ from ultralytics import YOLO
 import mediapipe as mp
 
 from checker_color_classifier import classify_checkers_by_brightness
+import torch
 
 class BackgammonCV:
     def __init__(self):
@@ -833,7 +834,9 @@ class BackgammonCV:
                 # CUBE
                 if self.detector.class_numbers[i] >= Class.CUBE_16 and self.detector.class_numbers[i] <= Class.CUBE_32:
                     newCube = Cube(self.detector.class_numbers[i] - Class.CUBE_16, self.detector.centers[i], self.detector.confidences[i])
-                    if newCube.center[1] < self.board.getBar().bbox_warped[0][0][1] + (self.board.getBar().bbox_warped[2][0][1] - self.board.getBar().bbox_warped[0][0][1]) / 4:
+                    if pointInPoly((newCube.center[0], newCube.center[1]), self.board.bbox):
+                        self.board.setCube(newCube)
+                    elif newCube.center[1] < self.board.getBar().bbox_warped[0][0][1] + (self.board.getBar().bbox_warped[2][0][1] - self.board.getBar().bbox_warped[0][0][1]) / 4:
                         newCube.owner = Color.WHITE
                         self.board.setCube(newCube)
                     elif newCube.center[1] > self.board.getBar().bbox_warped[0][0][1] + (self.board.getBar().bbox_warped[2][0][1] - self.board.getBar().bbox_warped[0][0][1]) * 3 / 4:
