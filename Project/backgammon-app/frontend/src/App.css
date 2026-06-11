@@ -159,6 +159,13 @@ body {
   margin-bottom: 16px;
 }
 
+.result__file {
+  font-size: 0.82rem;
+  color: var(--stone);
+  margin-bottom: 14px;
+  word-break: break-word;
+}
+
 .result__frames {
   display: flex;
   flex-wrap: wrap;
@@ -166,6 +173,10 @@ body {
   margin-bottom: 20px;
 }
 .result__frame-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   padding: 5px 12px;
   border: 1px solid var(--stone);
   border-radius: 99px;
@@ -182,16 +193,102 @@ body {
   border-color: var(--ink);
   color: var(--ivory);
 }
+.result__frame-btn-meta {
+  font-size: 0.68rem;
+  opacity: 0.78;
+}
 
 .result__frame-detail {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.result__frame-img {
-  width: 100%;
+
+.result__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.result__summary-card,
+.result__count-card {
+  background: var(--cream);
   border-radius: var(--radius);
-  border: 1px solid var(--cream);
+  padding: 14px 16px;
+  border: 1px solid rgba(26, 23, 20, 0.08);
+}
+.result__summary-label,
+.result__count-label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: 6px;
+}
+.result__summary-value,
+.result__count-value {
+  display: block;
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.25rem;
+  color: var(--ink);
+}
+.result__count-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--stone);
+}
+
+.result__counters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.result__points {
+  background: rgba(255, 255, 255, 0.38);
+  border: 1px solid rgba(26, 23, 20, 0.08);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.result__section-title {
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: 12px;
+}
+.result__point-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.result__point-row,
+.result__empty {
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: var(--cream);
+}
+.result__point-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.result__point-name {
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.result__point-value {
+  font-size: 0.82rem;
+  color: var(--stone);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .result__summary-grid,
+  .result__counters {
+    grid-template-columns: 1fr;
+  }
 }
 
 .result__pieces {

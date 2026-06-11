@@ -4,3 +4,8 @@ python-multipart>=0.0.9
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
+opencv-python
+shapely
+scikit_learn
+ultralytics
+mediapipe==0.10.9

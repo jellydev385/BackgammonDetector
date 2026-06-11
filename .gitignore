@@ -6,3 +6,8 @@
 /Tools/BackgammonCV/data/videos/*.mp4
 /Tools/BackgammonCV/tests
 /Tools/BackgammonCV/data/images/test
+/Tools/BackgammonCV/src/.venv
+/Project/backgammon-app/backend/detection_module/__pycache__
+/Project/backgammon-app/backend/app/__pycache__
+/Project/backgammon-app/backend/app/schemas/__pycache__
+/Project/backgammon-app/backend/app/services/__pycache__

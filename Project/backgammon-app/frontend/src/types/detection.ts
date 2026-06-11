@@ -5,20 +5,19 @@ export interface BoundingBox {
   height: number
 }
 
-export interface Piece {
-  id: string
-  color: 'white' | 'black'
-  point: number          // 1-24, 0=bar, 25=off
-  bounding_box: BoundingBox
-  confidence: number
+export interface CheckerCount {
+  white: number
+  black: number
 }
 
 export interface FrameResult {
-  frame_index: number
-  timestamp_sec: number
-  pieces: Piece[]
-  board_bounding_box?: BoundingBox
-  raw_image_base64?: string
+  turn: number
+  player: string
+  dice: number[]
+  cube: number
+  points: Record<string, CheckerCount>
+  bar: CheckerCount
+  borne_off: CheckerCount
 }
 
 export interface DetectionResponse {
