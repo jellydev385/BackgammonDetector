@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 from ultralytics import YOLO
 import torch
-
+        
 from Constants import CLASS_COLORS
 
 
@@ -47,9 +47,8 @@ class Detector:
 
     def __loadNetwork(self):
 
-        print(cv2.getBuildInformation())
         self.network = cv2.dnn.readNetFromDarknet("../data/cfg/yolov4.cfg", "../data/cfg/yolov4.weights")
-        
+
         if cv2.cuda.getCudaEnabledDeviceCount() > 0:
             print("[INFO] Using GPU (CUDA)")
             self.network.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)

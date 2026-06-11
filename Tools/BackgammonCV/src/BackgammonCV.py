@@ -24,6 +24,7 @@ from Class import Class
 from BoardPosition import BoardPosition
 from Snapshot import Snapshot
 from Snapshots import Snapshots
+from orientation_solver import OrientationSolver, BoardState, renumber_points_by_orientation
 from ultralytics import YOLO
 import mediapipe as mp
 
@@ -40,7 +41,7 @@ class BackgammonCV:
         self.black_borne_count = 0
         self.video = 0
         self.total_frames = 0
-        self.detection_every_n_frames = 15
+        self.detection_every_n_frames = 10
         self.fps = 0
         self.duration = 0
         self.frame_index = 0
@@ -91,6 +92,13 @@ class BackgammonCV:
 
         self.movements = []
         self.board_scene = 0
+
+        # Orientation inference state.
+        self.orientation_solver = OrientationSolver()
+        self.orientation_scores = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0}
+        self.board_orientation = None
+        self.orientation_locked = False
+        self.orientation_score_margin = 15.0
 
         self.p_min = 0.2
         self.threshold_nms = 0.3
@@ -175,6 +183,106 @@ class BackgammonCV:
 
         # Otherwise, board is abnormal (missing checkers or in invalid state)
         return False
+
+    def _board_to_state(self, board):
+        """Convert a `Board` to an orientation-solver `BoardState`.
+
+        The first 24 points are treated as the raw point order. Point id 25 is
+        treated as the bar. Borne-off counts come from the tracked counters on
+        `BackgammonCV`.
+        """
+        white = [0] * 24
+        black = [0] * 24
+        bar_white = 0
+        bar_black = 0
+
+        for raw_idx, point in enumerate(board.points[:24]):
+            for disk in point.disks:
+                if disk.color == Color.WHITE:
+                    white[raw_idx] += 1
+                else:
+                    black[raw_idx] += 1
+
+        for point in board.points:
+            if point.id == 25:
+                for disk in point.disks:
+                    if disk.color == Color.WHITE:
+                        bar_white += 1
+                    else:
+                        bar_black += 1
+                break
+
+        return BoardState(
+            white=white,
+            black=black,
+            bar_white=bar_white,
+            bar_black=bar_black,
+            borne_white=self.white_borne_count,
+            borne_black=self.black_borne_count,
+        )
+
+    def _apply_orientation_to_board(self, board, orientation_index):
+        """Return a copy of `board` renumbered to standard point order.
+
+        The point list is reordered so that point 1..24 are in standard order
+        and point IDs are rewritten to match the standard numbering.
+        """
+        if orientation_index is None:
+            return board.copy()
+
+        oriented = board.copy()
+        raw_points = oriented.points[:24]
+        if len(raw_points) == 24:
+            oriented_points = renumber_points_by_orientation(raw_points, orientation_index)
+        else:
+            oriented_points = [p.copy() for p in raw_points]
+            for idx, point in enumerate(oriented_points, start=1):
+                point.id = idx
+
+        bar_points = [p.copy() for p in oriented.points[24:] if p.id == 25]
+        if bar_points:
+            bar_points[0].id = 25
+
+        oriented.points = oriented_points + bar_points
+        return oriented
+
+    def _lock_orientation_if_possible(self, prev_board, current_board):
+        """Score the four orientations and lock/renumber when confidence is high."""
+        prev_state = self._board_to_state(prev_board)
+        curr_state = self._board_to_state(current_board)
+
+        dice = None
+        if len(current_board.dices) == 2:
+            dice = (current_board.dices[0].value, current_board.dices[1].value)
+
+        transition_scores, best_idx = self.orientation_solver.score_orientations(
+            [prev_state, curr_state],
+            dice_sequence=[dice],
+        )
+
+        for idx, value in transition_scores.items():
+            self.orientation_scores[idx] += value
+
+        best_total_idx = max(self.orientation_scores.items(), key=lambda kv: kv[1])[0]
+        total_scores = sorted(self.orientation_scores.values(), reverse=True)
+
+        if len(total_scores) >= 2 and (total_scores[0] - total_scores[1]) >= self.orientation_score_margin:
+            self.board_orientation = best_total_idx
+            self.orientation_locked = True
+            print(
+                f"[processStableBoard] Orientation locked to {best_total_idx} "
+                f"with scores {self.orientation_scores}"
+            )
+
+            # Renumber history so future move inference uses standard point ids.
+            self.prev_board = self._apply_orientation_to_board(self.prev_board, best_total_idx)
+            current_board = self._apply_orientation_to_board(current_board, best_total_idx)
+            self.movements = [self._apply_orientation_to_board(board, best_total_idx) for board in self.movements]
+            return current_board
+
+        # Keep the best total orientation so far for later transitions.
+        self.board_orientation = best_total_idx
+        return current_board
 
     def initBoardUI(self):
         pygame.init()
@@ -571,6 +679,14 @@ class BackgammonCV:
 
     def processStableBoard(self, stable_board):
 
+        # If the orientation has already been locked, normalize the incoming
+        # board before any comparison so all later move detection works in the
+        # standard point numbering.
+        if self.orientation_locked and self.board_orientation is not None:
+            stable_board = self._apply_orientation_to_board(stable_board, self.board_orientation)
+        elif len(self.prev_board.points) > 0:
+            stable_board = self._lock_orientation_if_possible(self.prev_board, stable_board)
+
         # Ignore identical board
         if stable_board.points == self.prev_board.points:
             # print(f"stable_board.dices={stable_board.dices}, prev_board.dices={self.prev_board.dices}")
@@ -797,7 +913,6 @@ class BackgammonCV:
             self.board.dices = []  # self.board.clear()
 
             checker_results = classify_checkers_by_brightness(self.frame, self.detector.bounding_boxes)
-            print(f"[detect] self.detector.centers #: {len(self.detector.centers)}, self.detector.class_numbers #: {len(self.detector.class_numbers)}")
             # Generate objects from YOLO detection ---------------------------------------------------------------
             for i in range(len(self.detector.centers)):
                 checker_result = checker_results[i]
