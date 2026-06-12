@@ -88,7 +88,7 @@ class BackgammonCV:
         self.candidate_count = 0
 
         # Require board to remain stable for N frames
-        self.STABLE_FRAMES = 1
+        self.STABLE_FRAMES = 2
 
         self.movements = []
         self.board_scene = 0
@@ -728,6 +728,11 @@ class BackgammonCV:
                 print("\t\t[processStableBoard] both white and black moved, ignoring.")
                 stable_board.clear()
                 self.prev_board.clear()
+                self.turn = 0
+                self.is_white_bearing = False
+                self.is_black_bearing = False
+                self.white_borne_count = 0
+                self.black_borne_count = 0
                 return
 
             print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
@@ -826,7 +831,7 @@ class BackgammonCV:
             print("[updateStableBoard] First candidate board")
             self.candidate_board = self.board.copy()
             self.candidate_count = 1
-            # return
+            return
 
         # Same as candidate
         if self.board.points == self.candidate_board.points:
