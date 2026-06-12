@@ -14,8 +14,8 @@ class Board:
         self.points = []
         self.dices = []
         self.turn = 0
-        self.player = None
         self.cube = None
+        self.player = None
         self.cube_owner = None
 
     def reset(self):
@@ -27,7 +27,10 @@ class Board:
         for point in self.points:
             point.clear()
         self.dices.clear()
+        self.turn = 0
+        self.cube = None
         self.player = None
+        self.cube_owner = None
 
     def addPoint(self, point):
         self.points.append(point)

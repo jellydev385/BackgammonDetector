@@ -265,12 +265,13 @@ class BackgammonCV:
 
         best_total_idx = max(self.orientation_scores.items(), key=lambda kv: kv[1])[0]
         total_scores = sorted(self.orientation_scores.values(), reverse=True)
+        print(f"[_lock_orientation_if_possible] total_scores={total_scores}")
 
         if len(total_scores) >= 2 and (total_scores[0] - total_scores[1]) >= self.orientation_score_margin:
             self.board_orientation = best_total_idx
             self.orientation_locked = True
             print(
-                f"[processStableBoard] Orientation locked to {best_total_idx} "
+                f"[_lock_orientation_if_possible] Orientation locked to {best_total_idx} "
                 f"with scores {self.orientation_scores}"
             )
 
@@ -687,6 +688,8 @@ class BackgammonCV:
         elif len(self.prev_board.points) > 0:
             stable_board = self._lock_orientation_if_possible(self.prev_board, stable_board)
 
+        print(f"[processStableBoard] orientation_locked = {self.orientation_locked}, board_orientation = {self.board_orientation}")
+
         # Ignore identical board
         if stable_board.points == self.prev_board.points:
             # print(f"stable_board.dices={stable_board.dices}, prev_board.dices={self.prev_board.dices}")
@@ -723,7 +726,8 @@ class BackgammonCV:
                 stable_board.player = Color.WHITE
             else:
                 print("\t\t[processStableBoard] both white and black moved, ignoring.")
-                self.prev_board = stable_board.copy()
+                stable_board.clear()
+                self.prev_board.clear()
                 return
 
             print(f"\t\t[processStableBoard] stable_board.dices: {stable_board.dices}, prev_board.dices: {self.prev_board.dices}")
@@ -1077,47 +1081,52 @@ class BackgammonCV:
         # print("\nEnd replay")
 
     def nextFrame(self):
-        self.frame_index += self.detection_every_n_frames
-        self.frame_index = min(self.frame_index, self.total_frames - 1)
-        if self.frame_index == self.total_frames - 1:
-            self.stop()
-            self.video.set(1, self.frame_index)
-            ret, self.frame = self.video.read()
-            if not ret:
-                print("Error reading last frame")
-                return
-            if not self.isPlaying:
-                cv2.imshow("Source", self.frame)
+        while True:
+            self.frame_index += self.detection_every_n_frames
+            self.frame_index = min(self.frame_index, self.total_frames - 1)
+            if self.frame_index == self.total_frames - 1:
+                self.stop()
+                self.video.set(1, self.frame_index)
+                ret, self.frame = self.video.read()
+                if not ret:
+                    print("Error reading last frame")
+                    return
+                if not self.isPlaying:
+                    cv2.imshow("Source", self.frame)
 
-            self.saveMovements()
-            # time.sleep(3)
-            # self.saveSnapshots()
-            # self.bar.finish()
-            # self.replay()
-        else:
+                self.saveMovements()
+                break
+                # time.sleep(3)
+                # self.saveSnapshots()
+                # self.bar.finish()
+                # self.replay()
+            else:
+                self.video.set(1, self.frame_index)
+                ret, self.frame = self.video.read()
+                if not ret:
+                    print("Error reading frame " + str(self.frame_index))
+                    continue
+                if not self.isPlaying:
+                    cv2.imshow("Source", self.frame)
+            print("Current frame: " + str(self.frame_index) + "/" + str(self.total_frames - 1))
+            break
+            # self.detect(self.frame)
+            # return self.frame_index
+
+    def previousFrame(self):
+        while self.frame_index > 0:
+            self.frame_index -= self.detection_every_n_frames
+            self.frame_index = max(0, self.frame_index)
             self.video.set(1, self.frame_index)
             ret, self.frame = self.video.read()
             if not ret:
                 print("Error reading frame " + str(self.frame_index))
-                return
+                continue
+            
             if not self.isPlaying:
                 cv2.imshow("Source", self.frame)
-        print("Current frame: " + str(self.frame_index) + "/" + str(self.total_frames - 1))
-        # self.detect(self.frame)
-        # return self.frame_index
-
-    def previousFrame(self):
-        self.frame_index -= self.detection_every_n_frames
-        self.frame_index = max(0, self.frame_index)
-        self.video.set(1, self.frame_index)
-        ret, self.frame = self.video.read()
-        if not ret:
-            print("Error reading frame " + str(self.frame_index))
-            return
-        
-        if not self.isPlaying:
-            cv2.imshow("Source", self.frame)
-        print("Current frame: " + str(self.frame_index) + "/" + str(self.total_frames - 1))
+            print("Current frame: " + str(self.frame_index) + "/" + str(self.total_frames - 1))
+            break
         # print(type(self.frame))
         # self.detect(self.frame)
         # return self.frame_index
